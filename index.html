@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --secondary: #50c878;
+            --background: #1a1a2e;
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --text: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .chart-container {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .process-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .process-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .process-name {
+            font-weight: 500;
+        }
+
+        .process-memory {
+            color: var(--primary);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        .updating {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Memory Allocation Tracker</h1>
+            <p>Real-time system memory monitoring</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Memory</h3>
+                <div id="totalMemory" class="stat-value">0 GB</div>
+            </div>
+            <div class="stat-card">
+                <h3>Used Memory</h3>
+                <div id="usedMemory" class="stat-value">0 GB</div>
+            </div>
+            <div class="stat-card">
+                <h3>Available Memory</h3>
+                <div id="availableMemory" class="stat-value">0 GB</div>
+            </div>
+            <div class="stat-card">
+                <h3>Memory Usage</h3>
+                <div id="memoryUsage" class="stat-value">0%</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="memoryChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Top Memory Processes</h2>
+            <div id="processList" class="process-list"></div>
+        </div>
+    </div>
+
+    <script>
+        let memoryChart;
+        const maxDataPoints = 60;
+        const chartData = {
+            labels: [],
+            datasets: [{
+                label: 'Memory Usage (%)',
+                data: [],
+                borderColor: '#4a90e2',
+                backgroundColor: 'rgba(74, 144, 226, 0.2)',
+                fill: true
+            }]
+        };
+
+        function initChart() {
+            const ctx = document.getElementById('memoryChart').getContext('2d');
+            memoryChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    animation: { duration: 750 },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: { color: '#fff' }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: { color: '#fff' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateProcessList(processes) {
+            const container = document.getElementById('processList');
+            container.innerHTML = '';
+            
+            processes.forEach(process => {
+                const item = document.createElement('div');
+                item.className = 'process-item';
+                item.innerHTML = `
+                    <span class="process-name">${process.name}</span>
+                    <span class="process-memory">${process.memory.toFixed(1)} MB</span>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function updateStats(data) {
+            document.getElementById('totalMemory').textContent = data.totalMemory.toFixed(2) + ' GB';
+            document.getElementById('usedMemory').textContent = data.usedMemory.toFixed(2) + ' GB';
+            document.getElementById('availableMemory').textContent = data.availableMemory.toFixed(2) + ' GB';
+            document.getElementById('memoryUsage').textContent = data.memoryUsage.toFixed(1) + '%';
+
+            const now = new Date();
+            chartData.labels.push(now.toLocaleTimeString());
+            chartData.datasets[0].data.push(data.memoryUsage);
+
+            if (chartData.labels.length > maxDataPoints) {
+                chartData.labels.shift();
+                chartData.datasets[0].data.shift();
+            }
+
+            memoryChart.update();
+            updateProcessList(data.processes);
+        }
+
+        function fetchData() {
+            fetch('http://localhost:8080/api/memory')
+                .then(response => response.json())
+                .then(data => updateStats(data))
+                .catch(error => console.error('Error:', error));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            fetchData();
+            setInterval(fetchData, 1000);
+        });
+    </script>
+</body>
+</html>
